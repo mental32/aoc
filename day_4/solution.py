@@ -1,15 +1,13 @@
-from concurrent.futures import ThreadPoolExecutor
-from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 from re import search
 
 INPUT_DATA = range(353096, 843212)
 
-ex = ThreadPoolExecutor()
-
 # Part 1
 
 def match(value: int) -> bool:
-    if len((code := str(value))) != 6:
+    code = str(value)
+    if len(code) != 6:
         return False
 
     last = -1
@@ -17,7 +15,8 @@ def match(value: int) -> bool:
     singles = []
 
     for digit in code:
-        if (cur := int(digit)) < last:
+        cur = int(digit)
+        if cur < last:
             return False
 
         last = cur
@@ -30,9 +29,6 @@ def match(value: int) -> bool:
 
     return bool(doubles)
 
-print("Part 1: ...", end="\r", flush=True)
-print(f"Part 1: {sum(ex.map(match, INPUT_DATA))}")
-
 # Part 2
 
 def match_more(value: int) -> bool:
@@ -43,5 +39,18 @@ def match_more(value: int) -> bool:
 
     return bool(search(r"(^|(.)(?!\2))(\d)\3{1}(?!\3)", code))
 
-print("Part 2: ...", end="\r", flush=True)
-print(f"Part 2: {sum(ex.map(match_more, INPUT_DATA))}")
+def work(func, part: str) -> None:
+    with ThreadPoolExecutor() as executor:
+        print(f"Part {part}: Started")
+        print(f"Part {part}: {sum(executor.map(func, INPUT_DATA))}")
+
+def main():
+    with ProcessPoolExecutor() as executor:
+        tasks = [executor.submit(work, func, part) for func, part in zip((match, match_more), "12")]
+
+        for task in tasks:
+            task.result()
+
+
+if __name__ == "__main__":
+    main()
