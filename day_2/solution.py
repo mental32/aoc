@@ -32,6 +32,19 @@ def main(**kwargs):
     code[1] = 12
     code[2] = 2
     unwind(code, **kwargs)
+    print(code[0])
+
+    for a in range(1, 100):
+        for b in range(1, 100):
+            code = input_code.copy()
+
+            code[1] = a
+            code[2] = b
+            unwind(code)
+
+            if code[0] == 19690720:
+                print(100 * a + b)
+                break
 
 
 if __name__ == "__main__":
