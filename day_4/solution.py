@@ -7,8 +7,8 @@ INPUT_DATA = range(353096, 843212)
 
 def match(value: int) -> bool:
     code = str(value)
-    if len(code) != 6:
-        return False
+
+    assert len(code) == 6
 
     last = -1
     doubles = 0
@@ -33,11 +33,7 @@ def match(value: int) -> bool:
 
 def match_more(value: int) -> bool:
     code = str(value)
-
-    if not match(value):
-        return False
-
-    return bool(search(r"(^|(.)(?!\2))(\d)\3{1}(?!\3)", code))
+    return list(code) == sorted(code) and 2 in map(code.count, code)
 
 def work(func, part: str) -> None:
     with ThreadPoolExecutor() as executor:
