@@ -1,12 +1,16 @@
 import qualified Data.List as L
 import qualified Data.Char as C (digitToInt)
 
-partOne :: String -> Int
-partOne n = fromEnum valid
+part :: (Int -> Bool) -> String -> Int
+part fn n = fromEnum $ (&&) (digits' == (L.sort digits')) $ any (fn . length) $ L.group n
   where
-    ordered = let digits' = ((map C.digitToInt)) n in (==digits') (L.sort digits')
-    doubles = ((any ((>=2) . length)) . L.group) n
-    valid   = ordered && doubles
+    digits' = map C.digitToInt n
 
 main :: IO ()
-main = (print . sum . (map (partOne . show))) [353096..843212]
+main = do
+    putStr "Part 1: "
+    print $ sum $ (map (part (>=2) . show)) input
+    putStr "Part 2: "
+    print $ sum $ (map (part (==2) . show)) input
+    where
+        input = [353096..843212]
