@@ -1,9 +1,9 @@
 module Solution ( compute, withInputData ) where
 
-import Data.Text.Read (decimal)
-import Data.Text as T hiding (map, zip, drop, splitAt, tail, length, head)
+import qualified Data.Text.Read as R (decimal)
+import qualified Data.Text as T (Text, pack, splitOn, empty, strip)
+import qualified Data.Either as E (fromRight)
 import System.IO (withFile, IOMode( ReadMode ), hGetContents)
-import Data.Either (fromRight)
 import Data.List
 
 compute :: (Integral a) => a -> [a] -> [a]
@@ -20,7 +20,7 @@ compute i xs
         (left, right) = genericSplitAt dst xs
 
 parse :: (Integral a) => T.Text -> [a]
-parse = map (fst . fromRight (99, T.empty) . decimal) . T.splitOn (T.pack ",") . T.strip
+parse = map (fst . E.fromRight (99, T.empty) . R.decimal) . T.splitOn (T.pack ",") . T.strip
 
 withInputData :: (Integral a) => ([a] -> IO ()) -> IO ()
 withInputData fn = withFile
