@@ -1,12 +1,15 @@
 import System.IO (withFile, hGetContents, IOMode ( ReadMode ))
 import qualified Data.List.Split as Sp (splitOn)
 import qualified Data.Set as S (intersection, map, findMin, fromList, toList)
-import qualified Data.Map as M (fromList)
+import qualified Data.Map as M (fromList, (!), Map)
 
 type Point = (Integer, Integer)
 
-fooX = M.fromList $ zip "LRUD" (-1, 1, 0, 0)
-fooY = M.fromList $ zip "LRUD" (0, 0, 1, -1)
+fooX :: (Num a) => M.Map Char a
+fooX = M.fromList $ zip "LRUD" [-1, 1, 0, 0]
+
+fooY :: (Num a) => M.Map Char a
+fooY = M.fromList $ zip "LRUD" [0, 0, 1, -1]
 
 points :: Point -> [String] -> [Point]
 points p []          = []
