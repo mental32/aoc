@@ -11,20 +11,15 @@ IMMEDIATE_MODE = "1"
 
 BUILTIN_OPS = {1: operator.add, 2: operator.mul, 7: operator.lt, 8: operator.eq}
 
-DEFAULT_ARGUMENT_MODES = {
-    "99": "",
-    # BinOp
-    "2": "000",
-    "1": "000",
-    # IO
-    "3": "1",
-    "4": "0",
-    # Branch
-    "5": "00",
-    "6": "00",
-    "7": "000",
-    "8": "000",
-}
+MODE_GROUPS = (
+    ("", ["99"]),
+    ("1", ["3"]),
+    ("0", ["4"]),
+    ("00", ["5", "6"]),
+    ("000", ["1", "2", "7", "8"]),
+)
+
+DEFAULT_ARGUMENT_MODES = {op: sig for sig, ops in MODE_GROUPS for op in ops}
 
 
 def decode(index, code):
@@ -37,18 +32,16 @@ def decode(index, code):
         return (99, ())
 
     for op in filter(raw.endswith, DEFAULT_ARGUMENT_MODES):
-        argument_count = len(DEFAULT_ARGUMENT_MODES[op])
+        argument_modes = DEFAULT_ARGUMENT_MODES[op]
+        argument_count = len(argument_modes)
 
-        if op == raw:
-            argument_modes = DEFAULT_ARGUMENT_MODES[op]
-        else:
+        if op != raw:
             argument_modes = raw[:-2].zfill(argument_count)
 
         if op == "4":
-            (mode,) = argument_modes
             value = code[index + 1]
 
-            if mode == POSITION_MODE:
+            if POSITION_MODE in argument_modes:
                 value = code[value]
 
             return (4, (value,))
@@ -59,7 +52,7 @@ def decode(index, code):
         def is_positional(mode: str, offset: int) -> Tuple[bool, int]:
             return (mode == POSITION_MODE, offset)
 
-        zipped = zip(argument_modes, range(argument_count - 1, -1, -1))
+        zipped = zip(argument_modes[::-1], range(argument_count))
 
         for positional, offset in starmap(is_positional, zipped):
             arguments[offset] = value = code[index + offset + 1]
@@ -91,11 +84,13 @@ def main(code, input_: List[int], index: int = 0) -> List[int]:
         if op == 99:
             return output
 
+        # fmt: off
         index = (
             (op == 5 if args[0] else op == 6)
             and args[1]
             or index + len(args) + 1
         )
+        # fmt: on
 
         if op in (1, 2, 7, 8):
             lhs, rhs, dst, = args
