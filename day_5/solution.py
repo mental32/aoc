@@ -1,5 +1,5 @@
 from itertools import starmap
-from typing import Tuple
+from typing import Tuple, List
 import operator
 
 with open("input_data") as file:
@@ -9,8 +9,10 @@ with open("input_data") as file:
 POSITION_MODE = "0"
 IMMEDIATE_MODE = "1"
 
-default_argument_modes = {
-    "99": "0",
+BUILTIN_OPS = {1: operator.add, 2: operator.mul, 7: operator.lt, 8: operator.eq}
+
+DEFAULT_ARGUMENT_MODES = {
+    "99": "",
     # BinOp
     "2": "000",
     "1": "000",
@@ -28,11 +30,17 @@ default_argument_modes = {
 def decode(index, code):
     raw = str(code[index])
 
-    for op in filter(raw.endswith, default_argument_modes):
-        argument_count = len(default_argument_modes[op])
+    if raw == "3":
+        return (3, (code[index + 1],))
+
+    if raw == "99":
+        return (99, ())
+
+    for op in filter(raw.endswith, DEFAULT_ARGUMENT_MODES):
+        argument_count = len(DEFAULT_ARGUMENT_MODES[op])
 
         if op == raw:
-            argument_modes = default_argument_modes[op]
+            argument_modes = DEFAULT_ARGUMENT_MODES[op]
         else:
             argument_modes = raw[:-2].zfill(argument_count)
 
@@ -45,29 +53,20 @@ def decode(index, code):
 
             return (4, (value,))
 
-        if op == "3":
-            (mode,) = argument_modes
-            return (3, (code[index + 1],))
-
         arguments = [None] * argument_count
         branching = op in ("5", "6")
 
         def is_positional(mode: str, offset: int) -> Tuple[bool, int]:
             return (mode == POSITION_MODE, offset)
 
-        zipped = zip(argument_modes, range(len(arguments) - 1, -1, -1))
+        zipped = zip(argument_modes, range(argument_count - 1, -1, -1))
 
-        try:
-            for positional, offset in starmap(is_positional, zipped):
-                arguments[offset] = value = code[index + offset + 1]
+        for positional, offset in starmap(is_positional, zipped):
+            arguments[offset] = value = code[index + offset + 1]
 
-                final = offset + 1 != argument_count
-                if positional and (branching or final):
-                    arguments[offset] = code[value]
-        except IndexError:
-            if op != "99":
-                raise
-            arguments = [0]
+            nonterminal = offset + 1 != argument_count
+            if positional and (branching or nonterminal):
+                arguments[offset] = code[value]
 
         assert None not in arguments, arguments
 
@@ -76,55 +75,42 @@ def decode(index, code):
     assert True, f"BAD INSTRUCTION {raw!r} {index!r}"
 
 
-def main(code, index: int = 0):
+def main(code, input_: List[int], index: int = 0) -> List[int]:
+    output = []
+
+    io = {
+        3: (lambda dst: operator.setitem(code, dst, input_.pop())),
+        4: output.append
+    }
+
     while True:
         op, args = decode(index, code)
 
         if op == 99:
-            (diag,) = args
-            print(f"exited with diagnostic code: {diag}")
-            break
+            return output
 
         index_ = index
 
         if op in (5, 6):
             cond, target = args
 
-            if op == 5 and cond:
-                index = target
-
-            elif op == 6 and not cond:
+            if (op == 5 and cond) or (op == 6 and not cond):
                 index = target
 
         if index_ == index:
             index += len(args) + 1
 
-        if op in (1, 2):
+        if op in (1, 2, 7, 8):
             lhs, rhs, dst, = args
-            f = operator.add if op == 1 else operator.mul
-            code[dst] = f(lhs, rhs)
+            f = BUILTIN_OPS[op]
+            code[dst] = f(lhs, rhs) + 0
 
-        elif op == 3:
+        elif op in (3, 4):
             (dst,) = args
-            code[dst] = v = int(input("$ "))
-
-        elif op == 4:
-            (dst,) = args
-            print(dst)
-
-        elif op in (7, 8):
-            lhs, rhs, dst = args
-            f = operator.eq if op == 8 else operator.lt
-            code[dst] = int(f(lhs, rhs))
+            io[op](dst)
 
 
 if __name__ == "__main__":
-    # Part 1
-    code = input_code.copy()
-    code[225] = 1
-    main(code, index=2)
-
-    # Part 2
-    code = input_code.copy()
-    code[225] = 5
-    main(code, index=2)
+    for inp in (1, 5):
+        output = main(input_code[:], [inp])
+        print(output)
