@@ -78,10 +78,12 @@ def decode(index, code):
 def main(code, input_: List[int], index: int = 0) -> List[int]:
     output = []
 
+    # fmt: off
     io = {
         3: (lambda dst: operator.setitem(code, dst, input_.pop())),
         4: output.append
     }
+    # fmt: on
 
     while True:
         op, args = decode(index, code)
@@ -89,16 +91,11 @@ def main(code, input_: List[int], index: int = 0) -> List[int]:
         if op == 99:
             return output
 
-        index_ = index
-
-        if op in (5, 6):
-            cond, target = args
-
-            if (op == 5 and cond) or (op == 6 and not cond):
-                index = target
-
-        if index_ == index:
-            index += len(args) + 1
+        index = (
+            ((op == 5 and args[0]) or (op == 6 and not args[0]))
+            and args[1]
+            or index + len(args) + 1
+        )
 
         if op in (1, 2, 7, 8):
             lhs, rhs, dst, = args
