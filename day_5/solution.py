@@ -10,6 +10,7 @@ POSITION_MODE = "0"
 IMMEDIATE_MODE = "1"
 
 BUILTIN_OPS = {1: operator.add, 2: operator.mul, 7: operator.lt, 8: operator.eq}
+BUILTIN_OPS_KEYS = tuple(BUILTIN_OPS)
 
 MODE_GROUPS = (
     ("", ["99"]),
@@ -49,15 +50,13 @@ def decode(index, code):
         arguments = [None] * argument_count
         branching = op in ("5", "6")
 
-        def is_positional(mode: str, offset: int) -> Tuple[bool, int]:
-            return (mode == POSITION_MODE, offset)
-
         zipped = zip(argument_modes[::-1], range(argument_count))
 
-        for positional, offset in starmap(is_positional, zipped):
+        for mode, offset in zipped:
             arguments[offset] = value = code[index + offset + 1]
 
             nonterminal = offset + 1 != argument_count
+            positional = mode == POSITION_MODE
             if positional and (branching or nonterminal):
                 arguments[offset] = code[value]
 
@@ -92,12 +91,12 @@ def main(code, input_: List[int], index: int = 0) -> List[int]:
         )
         # fmt: on
 
-        if op in (1, 2, 7, 8):
+        if op in BUILTIN_OPS_KEYS:
             lhs, rhs, dst, = args
             f = BUILTIN_OPS[op]
             code[dst] = f(lhs, rhs) + 0
 
-        elif op in (3, 4):
+        elif op in io:
             (dst,) = args
             io[op](dst)
 
