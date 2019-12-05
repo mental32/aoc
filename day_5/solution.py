@@ -92,7 +92,7 @@ def main(code, input_: List[int], index: int = 0) -> List[int]:
             return output
 
         index = (
-            ((op == 5 and args[0]) or (op == 6 and not args[0]))
+            (op == 5 if args[0] else op == 6)
             and args[1]
             or index + len(args) + 1
         )
