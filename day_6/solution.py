@@ -1,27 +1,24 @@
-data = []
-with open("input_data") as inf:
-    for line in inf:
-        left, right = line.strip().split(')')
-        data.append((left, right))
-
 from collections import defaultdict
+from typing import Tuple
+
+with open("input_data") as inf:
+    data = [line.strip().split(')') for line in inf if line.strip()]
 
 graph = defaultdict(list)
 
 for left, right in data:
     graph[left].append(right)
 
-from typing import Tuple
-
-def graph_(node) -> Tuple[int, int]:
+def distance(node) -> Tuple[int, int]:
     indirect = 0
 
     for child in graph[node]:
-        indirect += graph_(child) if child in graph else 0
+        if child in graph:
+            indirect += distance(child)
 
     return (len(graph[node]) + indirect)
 
-print(sum([graph_(node) for node in graph]))
+print(sum([distance(node) for node in graph]))
 
 def trace(node):
     tree = []
@@ -34,21 +31,14 @@ def trace(node):
 you = trace("YOU")[::-1]
 santa = trace("SAN")[::-1]
 
-you_ = set(you)
-san_ = set(santa)
+dist = len(you) + len(santa)
 
-def dist(from_, to):
-    f = trace(to)
-    return len(f[:f.index(from_)])
-
-dist_ = len(you) + len(santa)
-
-for node in {"COM"} | (san_ & you_):
+for node in {"COM"} | (set(you) & set(santa)):
     sdist = len(santa[:santa.index(node)])
     ydist = len(you[:you.index(node)])
     v = sdist + ydist
 
-    if v <= dist_:
-        dist_ = v
+    if v <= dist:
+        dist = v
 
-print(dist_)
+print(dist)
