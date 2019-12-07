@@ -1,11 +1,10 @@
 import operator
 from asyncio import run as asyncio_run, Queue, create_task, gather, sleep
 from contextlib import suppress
-from dataclasses import dataclass, field
 from enum import IntEnum
 from functools import lru_cache
 from itertools import cycle, permutations
-from typing import Tuple, List, Dict, Optional
+from typing import Tuple, List, Dict
 
 with suppress(ImportError):
     from uvloop import install as _uvloop_install
@@ -146,7 +145,7 @@ async def intcode_execute(
             await func(*args)
 
         # fmt: off
-        index = (
+        index = (  # pylint: disable=consider-using-ternary
             (op == Opcode.Jnz if args[0] else op == Opcode.Jez)
             and args[1]
             or index + len(args) + 1
@@ -158,20 +157,20 @@ async def main():
     with open("input_data") as file:
         input_code = [int(substr) for substr in file.read().strip().split(",")]
 
+    # There are five amps in total, chained.
+    channels = [Queue() for _ in range(5)]
+    head = channels[0]
+
+    # fmt: off
+    amps = [
+        (channel, channels[(index + 1) % 5])
+        for index, channel in enumerate(channels)
+    ]
+    # fmt: on
+
     for lower, upper in [(0, 4), (5, 9)]:
         largest = -1
         range_set = set(range(lower, upper + 1))
-
-        # There are five amps in total, chained.
-        channels = [Queue() for _ in range(5)]
-        head = channels[0]
-
-        # fmt: off
-        amps = [
-            (channel, channels[(index + 1) % 5])
-            for index, channel in enumerate(channels)
-        ]
-        # fmt: on
 
         for phases in permutations(range(lower, upper + 1)):
             assert set(phases) == range_set
@@ -192,9 +191,7 @@ async def main():
 
             assert not head.empty()
 
-            carry = head.get_nowait()
-            if carry > largest:
-                largest = carry
+            largest = max([head.get_nowait(), largest])
 
         print(largest)
 
