@@ -1,4 +1,4 @@
-from itertools import starmap
+from functools import lru_cache
 from typing import Tuple, List
 import operator
 
@@ -6,21 +6,25 @@ with open("input_data") as file:
     input_code = [int(substr) for substr in file.read().strip().split(",")]
 
 
-POSITION_MODE = "0"
-IMMEDIATE_MODE = "1"
+POSITION_MODE = 0
+# IMMEDIATE_MODE = 1
 
 BUILTIN_OPS = {1: operator.add, 2: operator.mul, 7: operator.lt, 8: operator.eq}
 BUILTIN_OPS_KEYS = tuple(BUILTIN_OPS)
 
 MODE_GROUPS = (
-    ("", ["99"]),
-    ("1", ["3"]),
-    ("0", ["4"]),
-    ("00", ["5", "6"]),
-    ("000", ["1", "2", "7", "8"]),
+    ([], ["99"]),
+    ([1], ["3"]),
+    ([0], ["4"]),
+    ([0, 0], ["5", "6"]),
+    ([0, 0, 0], ["1", "2", "7", "8"]),
 )
 
 DEFAULT_ARGUMENT_MODES = {op: sig for sig, ops in MODE_GROUPS for op in ops}
+
+@lru_cache(maxsize=64)
+def parse_raw_mode(mode: str) -> List[int]:
+    return [int(char) for char in mode]
 
 
 def decode(index, code):
@@ -37,7 +41,8 @@ def decode(index, code):
         argument_count = len(argument_modes)
 
         if op != raw:
-            argument_modes = raw[:-2].zfill(argument_count)
+            argument_modes = parse_raw_mode(raw[:-2].zfill(argument_count))
+
 
         if op == "4":
             value = code[index + 1]
@@ -52,12 +57,12 @@ def decode(index, code):
 
         zipped = zip(argument_modes[::-1], range(argument_count))
 
-        for mode, offset in zipped:
+
+        for immediate, offset in zipped:
             arguments[offset] = value = code[index + offset + 1]
 
             nonterminal = offset + 1 != argument_count
-            positional = mode == POSITION_MODE
-            if positional and (branching or nonterminal):
+            if not immediate and (branching or nonterminal):
                 arguments[offset] = code[value]
 
         assert None not in arguments, arguments
