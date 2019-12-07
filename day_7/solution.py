@@ -1,150 +1,184 @@
-from functools import lru_cache
-from typing import Tuple, List
 import operator
-
-with open("input_data") as file:
-    input_code = [int(substr) for substr in file.read().strip().split(",")]
-
+from asyncio import run as asyncio_run, Queue, create_task, gather, sleep
+from contextvars import ContextVar
+from dataclasses import dataclass, field
+from functools import lru_cache
+from itertools import cycle, permutations
+from typing import Tuple, List, Dict, Optional
 
 POSITION_MODE = 0
-# IMMEDIATE_MODE = 1
 
 BUILTIN_OPS = {1: operator.add, 2: operator.mul, 7: operator.lt, 8: operator.eq}
 BUILTIN_OPS_KEYS = tuple(BUILTIN_OPS)
 
-MODE_GROUPS = (
-    ([], ["99"]),
-    ([1], ["3"]),
-    ([0], ["4"]),
-    ([0, 0], ["5", "6"]),
-    ([0, 0, 0], ["1", "2", "7", "8"]),
-)
+MODE_GROUPS: List[Tuple[List[int], List[int]]] = [
+    ([], [99]),
+    ([1], [3]),
+    ([0], [4]),
+    ([0, 0], [5, 6]),
+    ([0, 0, 0], [1, 2, 7, 8]),
+]
 
-DEFAULT_ARGUMENT_MODES = {op: sig for sig, ops in MODE_GROUPS for op in ops}
+DEFAULT_ARGUMENT_MODES: Dict[int, List[int]] = {
+    op: sig for sig, ops in MODE_GROUPS for op in ops
+}
+
+AMP_DEBUG = ContextVar("AMP_DEBUG")
+
 
 @lru_cache(maxsize=64)
 def parse_raw_mode(mode: str) -> List[int]:
-    return [int(char) for char in mode]
+    return [int(part) for part in mode]
 
 
-def decode(index, code):
-    raw = str(code[index])
+@lru_cache(maxsize=128)
+def parse_arg_modes(word: int) -> Tuple[int, List[int], int]:
+    op = word % 10
 
-    if raw == "3":
-        return (3, (code[index + 1],))
+    argument_modes = DEFAULT_ARGUMENT_MODES[op]
+    argument_count = len(argument_modes)
 
-    if raw == "99":
-        return (99, [])
+    raw = str(word)
+    if str(op) != raw:
+        return op, parse_raw_mode(raw[:-2].zfill(argument_count)), argument_count
 
-    for op in filter(raw.endswith, DEFAULT_ARGUMENT_MODES):
-        argument_modes = DEFAULT_ARGUMENT_MODES[op]
-        argument_count = len(argument_modes)
-
-        if op != raw:
-            argument_modes = parse_raw_mode(raw[:-2].zfill(argument_count))
+    return op, argument_modes, argument_count
 
 
-        if op == "4":
-            value = code[index + 1]
+def decode(word: int, code: List[int], index: int) -> List[int]:
+    if word == 3:
+        return 3, [code[index + 1]]
 
-            if POSITION_MODE in argument_modes:
-                value = code[value]
+    if word == 4:
+        return 4, [code[code[index + 1]]]
 
-            return (4, (value,))
+    op, argument_modes, argument_count = parse_arg_modes(word)
 
-        arguments = [None] * argument_count
-        branching = op in ("5", "6")
+    if op == 4:
+        value = code[index + 1]
 
-        zipped = zip(argument_modes[::-1], range(argument_count))
+        if POSITION_MODE in argument_modes:
+            value = code[value]
 
-        for immediate, offset in zipped:
-            arguments[offset] = value = code[index + offset + 1]
+        return 4, [value]
 
-            nonterminal = offset + 1 != argument_count
-            if not immediate and nonterminal:
-                arguments[offset] = code[value]
+    zipped = zip(argument_modes[::-1], range(argument_count))
+    arguments = [None] * argument_count
 
-        assert None not in arguments, arguments
+    for immediate, offset in zipped:
+        arguments[offset] = value = code[index + offset + 1]
 
-        if branching:
-            arguments[-1] = code[arguments[-1]]
+        # XXX: If we can deterministically deduce the terminal argument we can omit this.
+        nonterminal = offset + 1 != argument_count
 
-        return (int(op), arguments)
+        if nonterminal and not immediate:
+            arguments[offset] = code[value]
 
-    assert False, f"BAD INSTRUCTION {raw!r} @ {index!r}"
+    assert None not in arguments, arguments
+
+    if op in (5, 6):  # branching
+        arguments[-1] = code[arguments[-1]]
+
+    return op, arguments
 
 
-def main(code, input_: List[int], index: int = 0) -> List[int]:
-    output = []
+async def intcode_execute(
+    code: List[int], inbound: Queue, outbound: Queue, index: int = 0,
+) -> None:
+    async def read(dst: int) -> None:
+        code[dst] = await inbound.get()
+
+    async def write(value: int) -> None:
+        await outbound.put(value)
 
     # fmt: off
     io = {
-        3: (lambda dst: operator.setitem(code, dst, input_.pop())),
-        4: output.append
+        3: read,
+        4: write
     }
     # fmt: on
 
-    while True:
-        print(f"{index=} {code[index]}, {code[index:index+4]}")
+    # Its a do-while but embeds code indexing logic
+    for word in (code[index] for _ in cycle((None,))):
+        await sleep(0)
 
-        outp = decode(index, code)
-        op, args = outp
+        if word == 99:
+            break
 
-        print(f"{index=}, {op=}, {args=}")
-
-        if op == 99:
-            return output
-
-        index_ = index
-
-        if op in (5, 6):
-            cond, target = args
-
-            if op == 5 and cond:
-                index = target
-
-            elif op == 6 and not cond:
-                index = target
-
-        if index_ == index:
-            index += len(args) + 1
-
-        # # fmt: off
-        # index = (
-        #     (op == 5 if args[0] else op == 6)
-        #     and args[1]
-        #     or index + len(args) + 1
-        # )
-        # # fmt: on
+        op, args = decode(word, code, index)
 
         if op in BUILTIN_OPS_KEYS:
+            func = BUILTIN_OPS[op]
             lhs, rhs, dst, = args
-            f = BUILTIN_OPS[op]
-            code[dst] = f(lhs, rhs) + 0
+            code[dst] = func(lhs, rhs) + 0
 
         elif op in io:
-            (dst,) = args
-            print(f"{index=} IO {op=} {output=} {input_=}")
-            io[op](dst)
-            print(f"{index=} IO {op=} {output=} {input_=}")
+            func = io[op]
+            await func(*args)
+
+        # fmt: off
+        index = (
+            (op == 5 if args[0] else op == 6)
+            and args[1]
+            or index + len(args) + 1
+        )
+        # fmt: on
+
+
+@dataclass
+class Amp:
+    ident: str
+    input: Queue = field(init=False, default_factory=Queue)
+    output: Queue = field(init=False, default_factory=Queue)
+
+    async def jitter(self, input_code: List[int]):
+        """Run this amp."""
+        AMP_DEBUG.set(f"Amp{self.ident}")
+        await intcode_execute(
+            input_code[:], self.input, self.output,
+        )
+
+
+async def main():
+    with open("input_data") as file:
+        input_code = [int(substr) for substr in file.read().strip().split(",")]
+
+    # There are five amps in total, chained.
+    amps = [Amp("A")]
+
+    for ident in "BCDE":
+        amp = Amp(ident)
+        amp.input = amps[-1].output
+        amps.append(amp)
+
+    amps[0].input = amps[-1].output
+
+    largest = -1
+
+    part_one: bool = False
+    lower, upper = (0, 4) if part_one else (5, 9)
+
+    range_set = set(range(lower, upper + 1))
+
+    for phases in permutations(range(lower, upper + 1)):
+        print(f"Running amps with: {phases}")
+        assert set(phases) == range_set
+
+        for phase, amp in zip(phases, amps):
+            await amp.input.put(phase)
+
+        await amps[0].input.put(0)
+
+        await gather(*[create_task(amp.jitter(input_code)) for amp in amps])
+
+        assert not amps[-1].output.empty()
+
+        carry = amps[-1].output.get_nowait()
+        if carry > largest:
+            largest = carry
+
+    print(largest)
 
 
 if __name__ == "__main__":
-    from itertools import cycle, permutations
-
-
-
-    largest = -1
-    for index, phases in enumerate(permutations(range(5))):
-        assert set(phases) == {0, 1, 2, 3, 4}
-        carry = 0
-        for phase in phases:
-            # output = main([3,15,3,16,1002,16,10,16,1,16,15,15,4,15,99,0,0], [phase, carry])
-            output = main(input_code[:], [carry, phase])
-            print(index, output)
-            carry = output[-1]
-
-            if carry > largest:
-                largest = carry
-
-    print(largest)
+    asyncio_run(main())
