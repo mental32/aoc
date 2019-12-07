@@ -91,17 +91,16 @@ def decode(word: int, code: List[int], index: int) -> List[int]:
 
         return Opcode.Write, [value]
 
-    zipped = zip(argument_modes[::-1], range(argument_count))
+    zipped = zip(argument_modes[-1:0:-1], range(argument_count - 1))
     arguments = [None] * argument_count
 
     for immediate, offset in zipped:
         arguments[offset] = value = code[index + offset + 1]
 
-        # XXX: If we can deterministically deduce the terminal argument we can omit this.
-        nonterminal = offset + 1 != argument_count
-
-        if nonterminal and not immediate:
+        if not immediate:
             arguments[offset] = code[value]
+
+    arguments[-1] = code[index + argument_count]
 
     assert None not in arguments, arguments
 
