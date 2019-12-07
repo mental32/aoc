@@ -9,6 +9,7 @@ from typing import Tuple, List, Dict, Optional
 
 with suppress(ImportError):
     from uvloop import install as _uvloop_install
+
     _uvloop_install()
 
 POSITION_MODE = 0
@@ -153,32 +154,19 @@ async def intcode_execute(
         # fmt: on
 
 
-@dataclass
-class Amp:
-    ident: str
-    input: Queue = field(init=False, default_factory=Queue)
-    output: Queue = field(init=False, default_factory=Queue)
-
-    async def jitter(self, input_code: List[int]):
-        """Run this amp."""
-        await intcode_execute(
-            input_code[:], self.input, self.output,
-        )
-
-
 async def main():
     with open("input_data") as file:
         input_code = [int(substr) for substr in file.read().strip().split(",")]
 
     # There are five amps in total, chained.
-    amps = [Amp("A")]
+    channels = [Queue() for _ in range(5)]
 
-    for ident in "BCDE":
-        amp = Amp(ident)
-        amp.input = amps[-1].output
-        amps.append(amp)
-
-    amps[0].input = amps[-1].output
+    # fmt: off
+    amps = [
+        (channel, channels[(index + 1) % 5])
+        for index, channel in enumerate(channels)
+    ]
+    # fmt: on
 
     largest = -1
 
@@ -188,18 +176,24 @@ async def main():
 
     for phases in permutations(range(lower, upper + 1)):
         assert set(phases) == range_set
+        assert all(channel.empty() for channel in channels)
 
-        for phase, amp in zip(phases, amps):
-            await amp.input.put(phase)
+        for phase, channel in zip(phases, channels):
+            await channel.put(phase)
 
         # Special case, ampA takes an inital argument of 0.
-        await amps[0].input.put(0)
+        await channels[0].put(0)
 
-        await gather(*[create_task(amp.jitter(input_code)) for amp in amps])
+        # fmt: off
+        await gather(*[
+            create_task(intcode_execute(input_code[:], inb, outb))
+            for inb, outb in amps
+        ])
+        # fmt: on
 
-        assert not amps[-1].output.empty()
+        assert not channels[0].empty()
 
-        carry = amps[-1].output.get_nowait()
+        carry = channels[0].get_nowait()
         if carry > largest:
             largest = carry
 
