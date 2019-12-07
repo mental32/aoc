@@ -4,7 +4,8 @@ from contextlib import suppress
 from enum import IntEnum
 from functools import lru_cache
 from itertools import cycle, permutations
-from typing import Tuple, List, Dict
+from sys import maxsize
+from typing import Tuple, List, Dict, Union, Callable, TypeVar, TYPE_CHECKING
 
 with suppress(ImportError):
     from uvloop import install as _uvloop_install
@@ -13,6 +14,7 @@ with suppress(ImportError):
 
 POSITION_MODE = 0
 
+T = TypeVar("T")  # pylint: disable=invalid-name
 
 class Opcode(IntEnum):
     # BinOps
@@ -31,7 +33,8 @@ class Opcode(IntEnum):
     Halt = 99
 
 
-BUILTIN_OPS = {
+OpcodeT = Union[Opcode, int]
+BUILTIN_OPS: Dict[OpcodeT, Callable[[T, T], T]] = {
     Opcode.Add: operator.add,
     Opcode.Mul: operator.mul,
     Opcode.Lt: operator.lt,
@@ -50,7 +53,7 @@ MODE_GROUPS: List[Tuple[List[int], List[Opcode]]] = [
     ([0, 0, 0], [Opcode.Add, Opcode.Mul, Opcode.Lt, Opcode.Eq]),
 ]
 
-DEFAULT_ARGUMENT_MODES: Dict[int, List[int]] = {
+DEFAULT_ARGUMENT_MODES: Dict[OpcodeT, List[int]] = {
     op: sig for sig, ops in MODE_GROUPS for op in ops
 }
 
@@ -74,7 +77,9 @@ def parse_arg_modes(word: int) -> Tuple[int, List[int], int]:
     return op, argument_modes, argument_count
 
 
-def decode(word: int, code: List[int], index: int) -> List[int]:
+def decode(
+    word: int, code: List[int], index: int
+) -> Tuple[OpcodeT, List[int]]:
     if word == Opcode.Read:
         return Opcode.Read, [code[index + 1]]
 
@@ -92,7 +97,7 @@ def decode(word: int, code: List[int], index: int) -> List[int]:
         return Opcode.Write, [value]
 
     zipped = zip(argument_modes[-1:0:-1], range(argument_count - 1))
-    arguments = [None] * argument_count
+    arguments: List[int] = [maxsize] * argument_count
 
     for immediate, offset in zipped:
         arguments[offset] = value = code[index + offset + 1]
@@ -141,8 +146,8 @@ async def intcode_execute(
             code[dst] = func(lhs, rhs) + 0
 
         elif op in io:
-            func = io[op]
-            await func(*args)
+            func = io[op]  # type: ignore
+            await func(*args)  # type: ignore
 
         # fmt: off
         index = (  # pylint: disable=consider-using-ternary
