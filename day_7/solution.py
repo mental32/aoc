@@ -1,29 +1,53 @@
 import operator
 from asyncio import run as asyncio_run, Queue, create_task, gather, sleep
-from contextvars import ContextVar
 from dataclasses import dataclass, field
+from enum import IntEnum
 from functools import lru_cache
 from itertools import cycle, permutations
 from typing import Tuple, List, Dict, Optional
 
 POSITION_MODE = 0
 
-BUILTIN_OPS = {1: operator.add, 2: operator.mul, 7: operator.lt, 8: operator.eq}
+
+class Opcode(IntEnum):
+    # BinOps
+    Add = 1
+    Mul = 2
+    # I/O
+    Read = 3
+    Write = 4
+    # Branching
+    Jnz = 5
+    Jez = 6
+    # Boolean logic
+    Lt = 7
+    Eq = 8
+    # Special
+    Halt = 99
+
+
+BUILTIN_OPS = {
+    Opcode.Add: operator.add,
+    Opcode.Mul: operator.mul,
+    Opcode.Lt: operator.lt,
+    Opcode.Eq: operator.eq,
+}
+
 BUILTIN_OPS_KEYS = tuple(BUILTIN_OPS)
 
-MODE_GROUPS: List[Tuple[List[int], List[int]]] = [
-    ([], [99]),
-    ([1], [3]),
-    ([0], [4]),
-    ([0, 0], [5, 6]),
-    ([0, 0, 0], [1, 2, 7, 8]),
+BRANCHING_OPCODES = (Opcode.Jnz, Opcode.Jez)
+
+MODE_GROUPS: List[Tuple[List[int], List[Opcode]]] = [
+    ([], [Opcode.Halt]),
+    ([1], [Opcode.Read]),
+    ([0], [Opcode.Write]),
+    ([0, 0], [Opcode.Jnz, Opcode.Jez]),
+    ([0, 0, 0], [Opcode.Add, Opcode.Mul, Opcode.Lt, Opcode.Eq]),
 ]
 
 DEFAULT_ARGUMENT_MODES: Dict[int, List[int]] = {
     op: sig for sig, ops in MODE_GROUPS for op in ops
 }
-
-AMP_DEBUG = ContextVar("AMP_DEBUG")
 
 
 @lru_cache(maxsize=64)
@@ -46,21 +70,21 @@ def parse_arg_modes(word: int) -> Tuple[int, List[int], int]:
 
 
 def decode(word: int, code: List[int], index: int) -> List[int]:
-    if word == 3:
-        return 3, [code[index + 1]]
+    if word == Opcode.Read:
+        return Opcode.Read, [code[index + 1]]
 
-    if word == 4:
-        return 4, [code[code[index + 1]]]
+    if word == Opcode.Write:
+        return Opcode.Write, [code[code[index + 1]]]
 
     op, argument_modes, argument_count = parse_arg_modes(word)
 
-    if op == 4:
+    if op == Opcode.Write:
         value = code[index + 1]
 
         if POSITION_MODE in argument_modes:
             value = code[value]
 
-        return 4, [value]
+        return Opcode.Write, [value]
 
     zipped = zip(argument_modes[::-1], range(argument_count))
     arguments = [None] * argument_count
@@ -76,7 +100,7 @@ def decode(word: int, code: List[int], index: int) -> List[int]:
 
     assert None not in arguments, arguments
 
-    if op in (5, 6):  # branching
+    if op in BRANCHING_OPCODES:  # branching
         arguments[-1] = code[arguments[-1]]
 
     return op, arguments
@@ -93,16 +117,16 @@ async def intcode_execute(
 
     # fmt: off
     io = {
-        3: read,
-        4: write
+        Opcode.Read: read,
+        Opcode.Write: write
     }
     # fmt: on
 
-    # Its a do-while but embeds code indexing logic
+    # Its a do-while that performs a lookup.
     for word in (code[index] for _ in cycle((None,))):
         await sleep(0)
 
-        if word == 99:
+        if word == Opcode.Halt:
             break
 
         op, args = decode(word, code, index)
@@ -118,7 +142,7 @@ async def intcode_execute(
 
         # fmt: off
         index = (
-            (op == 5 if args[0] else op == 6)
+            (op == Opcode.Jnz if args[0] else op == Opcode.Jez)
             and args[1]
             or index + len(args) + 1
         )
@@ -133,7 +157,6 @@ class Amp:
 
     async def jitter(self, input_code: List[int]):
         """Run this amp."""
-        AMP_DEBUG.set(f"Amp{self.ident}")
         await intcode_execute(
             input_code[:], self.input, self.output,
         )
@@ -157,16 +180,15 @@ async def main():
 
     part_one: bool = False
     lower, upper = (0, 4) if part_one else (5, 9)
-
     range_set = set(range(lower, upper + 1))
 
     for phases in permutations(range(lower, upper + 1)):
-        print(f"Running amps with: {phases}")
         assert set(phases) == range_set
 
         for phase, amp in zip(phases, amps):
             await amp.input.put(phase)
 
+        # Special case, ampA takes an inital argument of 0.
         await amps[0].input.put(0)
 
         await gather(*[create_task(amp.jitter(input_code)) for amp in amps])
