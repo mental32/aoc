@@ -158,46 +158,45 @@ async def main():
     with open("input_data") as file:
         input_code = [int(substr) for substr in file.read().strip().split(",")]
 
-    # There are five amps in total, chained.
-    channels = [Queue() for _ in range(5)]
+    for lower, upper in [(0, 4), (5, 9)]:
+        largest = -1
+        range_set = set(range(lower, upper + 1))
 
-    # fmt: off
-    amps = [
-        (channel, channels[(index + 1) % 5])
-        for index, channel in enumerate(channels)
-    ]
-    # fmt: on
-
-    largest = -1
-
-    part_one: bool = False
-    lower, upper = (0, 4) if part_one else (5, 9)
-    range_set = set(range(lower, upper + 1))
-
-    for phases in permutations(range(lower, upper + 1)):
-        assert set(phases) == range_set
-        assert all(channel.empty() for channel in channels)
-
-        for phase, channel in zip(phases, channels):
-            await channel.put(phase)
-
-        # Special case, ampA takes an inital argument of 0.
-        await channels[0].put(0)
+        # There are five amps in total, chained.
+        channels = [Queue() for _ in range(5)]
+        head = channels[0]
 
         # fmt: off
-        await gather(*[
-            create_task(intcode_execute(input_code[:], inb, outb))
-            for inb, outb in amps
-        ])
+        amps = [
+            (channel, channels[(index + 1) % 5])
+            for index, channel in enumerate(channels)
+        ]
         # fmt: on
 
-        assert not channels[0].empty()
+        for phases in permutations(range(lower, upper + 1)):
+            assert set(phases) == range_set
+            assert all(channel.empty() for channel in channels)
 
-        carry = channels[0].get_nowait()
-        if carry > largest:
-            largest = carry
+            for phase, channel in zip(phases, channels):
+                await channel.put(phase)
 
-    print(largest)
+            # Special case, ampA takes an inital argument of 0.
+            await head.put(0)
+
+            # fmt: off
+            await gather(*[
+                create_task(intcode_execute(input_code[:], inb, outb))
+                for inb, outb in amps
+            ])
+            # fmt: on
+
+            assert not head.empty()
+
+            carry = head.get_nowait()
+            if carry > largest:
+                largest = carry
+
+        print(largest)
 
 
 if __name__ == "__main__":
