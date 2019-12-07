@@ -1,10 +1,15 @@
 import operator
 from asyncio import run as asyncio_run, Queue, create_task, gather, sleep
+from contextlib import suppress
 from dataclasses import dataclass, field
 from enum import IntEnum
 from functools import lru_cache
 from itertools import cycle, permutations
 from typing import Tuple, List, Dict, Optional
+
+with suppress(ImportError):
+    from uvloop import install as _uvloop_install
+    _uvloop_install()
 
 POSITION_MODE = 0
 
