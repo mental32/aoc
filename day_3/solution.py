@@ -6,8 +6,8 @@ with open("input_data") as file:
 
 assert left.count(",") == right.count(",")
 
-x_ = dict(zip("LRUD", (-1, 1, 0, 0)))
-y_ = dict(zip("LRUD", (0, 0, 1, -1)))
+x_delta = dict(zip("LRUD", (-1, 1, 0, 0)))
+y_delta = dict(zip("LRUD", (0, 0, 1, -1)))
 
 def points_for(some: str) -> Iterator[Tuple[int, int, int]]:
     x = y = 0
@@ -18,8 +18,8 @@ def points_for(some: str) -> Iterator[Tuple[int, int, int]]:
         direction, magnitude = element[:1], element[1:]
 
         for _ in range(int(magnitude)):
-            x += x_[direction]
-            y += y_[direction]
+            x += x_delta[direction]
+            y += y_delta[direction]
             steps += 1
             yield (x, y, steps)
 
