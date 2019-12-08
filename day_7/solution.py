@@ -1,5 +1,5 @@
 import operator
-from asyncio import run as asyncio_run, Queue, create_task, gather, sleep
+from asyncio import get_event_loop, Queue, gather, sleep
 from contextlib import suppress
 from enum import IntEnum
 from functools import lru_cache
@@ -158,7 +158,7 @@ async def intcode_execute(
         # fmt: on
 
 
-async def main():
+def main():
     with open("input_data") as file:
         input_code = [int(substr) for substr in file.read().strip().split(",")]
 
@@ -173,6 +173,8 @@ async def main():
     ]
     # fmt: on
 
+    loop = get_event_loop()
+
     for lower, upper in [(0, 4), (5, 9)]:
         largest = -1
         range_set = set(range(lower, upper + 1))
@@ -182,16 +184,16 @@ async def main():
             assert all(channel.empty() for channel in channels)
 
             for phase, channel in zip(phases, channels):
-                await channel.put(phase)
+                channel.put_nowait(phase)
 
             # Special case, ampA takes an inital argument of 0.
-            await head.put(0)
+            head.put_nowait(0)
 
             # fmt: off
-            await gather(*[
-                create_task(intcode_execute(input_code[:], inb, outb))
+            loop.run_until_complete(gather(*[
+                loop.create_task(intcode_execute(input_code[:], inb, outb))
                 for inb, outb in amps
-            ])
+            ]))
             # fmt: on
 
             assert not head.empty()
@@ -202,4 +204,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio_run(main())
+    main()
