@@ -1,2 +1,0 @@
-# aoc
-Advent of code
