@@ -1,0 +1,12 @@
+[package]
+name = "d2"
+version = "0.1.0"
+authors = ["mental <m3nta1@yahoo.com>"]
+edition = "2018"
+
+[dependencies]
+bytecount = "0.6.2"
+lazy_static = "1.4.0"
+regex = "1.4.2"
+serde = "1.0.117"
+serde_scan = "0.4.0"

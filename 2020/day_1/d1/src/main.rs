@@ -1,11 +1,19 @@
-use crossbeam_utils::CachePadded;
-
+#![feature(is_sorted)]
 #[inline]
-fn crop_search(inp: &[isize]) -> Option<isize> {
+fn crop_search(inp: &[i32]) -> Option<i32> {
+    let is_sorted = inp.is_sorted();
+    let contains = |z| {
+        if is_sorted {
+            inp.binary_search(&z).is_ok()
+        } else {
+            inp.contains(&z)
+        }
+    };
+
     for (i, x) in inp.iter().enumerate() {
         for y in &inp[i + 1..] {
             let z = 2020 - x - y;
-            if inp.binary_search(&z.into()).is_ok() {
+            if contains(z) {
                 return Some(x * y * z);
             }
         }
@@ -14,25 +22,36 @@ fn crop_search(inp: &[isize]) -> Option<isize> {
     None
 }
 
+const NEEDLE: i32 = 138233720;
 const CHALLANGE: &str = include_str!("../../one_inp.txt");
 
 fn main() {
-    use std::time::Instant;
+    use std::time::{Duration, Instant};
 
-    let mut cache_parsed: CachePadded<[isize; 200]> = CachePadded::from([0isize; 200]);
-    {
-        let mut parsed: Vec<isize> = CHALLANGE
-            .trim()
-            .split("\n")
-            .map(|part| part.parse().unwrap())
-            .collect::<Vec<_>>();
+    let mut n = vec![];
+    for _ in 0..1 {
+        let start = Instant::now();
+        let mut buf: [i32; 200] = [0; 200];
 
-        parsed.sort_unstable();
+        {
+            let mut parsed: Vec<_> = CHALLANGE
+                .split("\n")
+                .filter_map(|part| part.parse().ok())
+                .collect();
 
-        cache_parsed.copy_from_slice(parsed.as_slice());
+            parsed.sort_unstable();
+
+            buf.copy_from_slice(parsed.as_slice());
+        }
+
+        assert_eq!(crop_search(&buf), Some(NEEDLE));
+        n.push(Instant::now() - start);
     }
 
-    let start = Instant::now();
-    assert_eq!(crop_search(&*cache_parsed), Some(138233720));
-    dbg!(Instant::now() - start);
+    eprintln!(
+        "{:?} (fastest) : {:?} (slowest) : {:?} (avg)",
+        n.iter().min(),
+        n.iter().max(),
+        n.iter().sum::<Duration>() / n.len() as u32
+    );
 }
