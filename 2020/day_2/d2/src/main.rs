@@ -27,14 +27,10 @@ impl Policy {
         let st = st.as_bytes();
         let letter = self.letter as u8;
 
-        let min_ch = st[self.min - 1];
-        let max_ch = st[self.max - 1];
+        let a = st[self.min - 1];
+        let b = st[self.max - 1];
 
-        if (max_ch != min_ch) && (max_ch == letter || min_ch == letter) {
-            1
-        } else {
-            0
-        }
+        ((a == letter) != (b == letter)) as usize
     }
 }
 
