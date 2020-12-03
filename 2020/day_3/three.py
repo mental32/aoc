@@ -18,12 +18,13 @@ def solve(delta, start = (0, 0)) -> int:
     hits = 0
 
     while True:
+        # print(x, y, hits, (l := input_data[y % len(input_data)]), l[x % row_length])
         try:
-            hits += input_data[y][x] == '#'
+            hits += input_data[y][x % row_length] == '#'
         except IndexError:
             return hits
 
-        x += dx % row_length
+        x += dx
         y += dy
 
 
@@ -43,6 +44,9 @@ def part2() -> int:
     return n
 
 from timeit import timeit
+
+assert part1() == 187, part1()
+assert part2() == 4723283400, part2()
 
 print(f"Part1 -> {timeit('part1()', globals=globals())}")
 print(f"Part2 -> {timeit('part2()', globals=globals())}")
