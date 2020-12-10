@@ -1,6 +1,7 @@
 from collections import deque
 from pathlib import Path
-from typing import Deque, Iterable, List
+from typing import Deque, Iterable, List, Tuple
+from itertools import permutations
 
 p = Path(__file__).parent.joinpath("nine.txt").absolute()
 
@@ -8,26 +9,30 @@ assert p.exists()
 
 inp = list(map(int, p.read_text().strip().split("\n")))
 
-def is_valid_product(n: int, s: Iterable[int]) -> bool:
-    l = set(s)
+def is_valid_product(n: int, preamble: Iterable[int]) -> bool:
+    unique = set(preamble)
+    
+    def check(ab: Tuple[int, ...]) -> bool:
+        (a, b) = ab
+        return (a + b) == n if a != b else False
 
-    from itertools import permutations
+    pairs = permutations(unique, 2)
 
-    for (a, b) in permutations(l, 2):
-        if a == b:
-            continue
+    validated = filter(check, pairs)
 
-        if (a + b) == n:
-            return True
-    else:
+    try:
+        next(validated)
+    except StopIteration:
         return False
+    else:
+        return True
 
 def part1(inp: List[int]):
-    preamble: Deque[int] = deque(map(int, inp[:25]))
+    preamble: Deque[int] = deque(inp[:25])
 
     stream = iter(inp[25:])
 
-    for number in map(int, stream):
+    for number in stream:
         assert is_valid_product(number, preamble), number
         preamble.popleft()
         preamble.append(number)
