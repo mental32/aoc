@@ -24,7 +24,7 @@ def parse(p: Path) -> Tuple["SeatPlan", range, range]:
         for y, c in enumerate(row)
     }
 
-    seats = {xy for xy, cell in body.items() if cell == EMPTY}
+    seats: Set[Tuple[int, int]] = {xy for xy, cell in body.items() if cell == EMPTY}
 
     return (SeatPlan(body, seats), rows, cols)
 
@@ -92,12 +92,12 @@ class SeatPlan(NamedTuple):
             nonlocal diffs, plan
 
             (col, row) = xy
-            acc = 0
+            acc = occupation_threshold
 
             for xy in adjacent_cb(plan, col, row):
-                acc += plan.cache[xy] == OCCUPIED
+                acc -= plan.cache[xy] == OCCUPIED
 
-                if acc >= occupation_threshold:
+                if not acc:
                     diffs += 1
                     return EMPTY
             else:
@@ -148,10 +148,10 @@ class SeatPlan(NamedTuple):
                     occupy.add(seat)
 
             for seat in occupied:
-                acc = 0
+                acc = occupation_threshold
                 for neighbor in neighbors[seat]:
-                    acc += neighbor in occupied
-                    if acc >= occupation_threshold:
+                    acc -= neighbor in occupied
+                    if not acc:
                         deoccupy.add(seat)
                         break
 
