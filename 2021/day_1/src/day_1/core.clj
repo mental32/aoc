@@ -3,7 +3,6 @@
 
 (defn parse-input [input] (map read-string (split-lines (slurp input))))
 
-(defn maybe-incr [xy, val] (if (xy) (+ val 1) val))
 (defn part-one
   ([seq] (part-one (vector (first seq)) (rest seq) 0 0))
   ([done rem incrs decrs]
@@ -11,9 +10,13 @@
      (empty? rem) {:n-incrs incrs, :n-decrs decrs}
      :else (let [x (last done)
                  y (first rem)
-                 incrs (maybe-incr (> x y) incrs)
-                 decrs (maybe-incr (< x y) decrs)]
-             (part-one (conj done rem) (rest rem) incrs decrs)))))
+                 incr-if (fn [b, n] (+ n ({true 1, false 0} b)))]
+             (part-one
+              (conj done y)
+              (rest rem)
+              (incr-if (< x y) incrs)
+              (incr-if (> x y) decrs))))))
+
 
 (defn sum-of-head [seq] (reduce + (take 3 seq)))
 (defn part-two
