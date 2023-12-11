@@ -203,3 +203,183 @@ Game 5: 6 red, 1 blue, 3 green; 2 blue, 1 red, 2 green
         assert_eq!(part_two(include_str!("./data/day2.txt")), 72422);
     }
 }
+
+#[cfg(test)]
+mod day_3 {
+    fn part_one(input: &str) -> usize {
+        let it = input.lines().enumerate().flat_map(|(y, line)| {
+            line.chars().enumerate().filter_map(move |(x, ch)| {
+                if ch == '.' || ch.is_digit(10) {
+                    None
+                } else {
+                    Some((x, y))
+                }
+            })
+        });
+
+        let mut input: Vec<String> = input.lines().map(|st| st.to_owned()).collect();
+
+        let mut sum = 0;
+        for (x, y) in it {
+            for (x, y) in [
+                (x + 1, y),     // right
+                (x - 1, y),     // left
+                (x, y + 1),     // down
+                (x, y - 1),     // up
+                (x + 1, y + 1), // down right
+                (x - 1, y - 1), // up left
+                (x + 1, y - 1), // up right
+                (x - 1, y + 1), // down left
+            ] {
+                let Some(line) = input.iter().nth(y).clone() else {
+                    continue;
+                };
+
+                let Some(ch) = line.chars().nth(x) else {
+                    continue;
+                };
+
+                if !ch.is_digit(10) {
+                    continue;
+                }
+
+                let after = line
+                    .chars()
+                    .skip(x)
+                    .take_while(|c| c.is_digit(10))
+                    .collect::<String>();
+
+                let before = line
+                    .chars()
+                    .take(x)
+                    .collect::<Vec<_>>()
+                    .into_iter()
+                    .rev()
+                    .take_while(|c| c.is_digit(10))
+                    .collect::<String>()
+                    .chars()
+                    .rev()
+                    .collect::<String>();
+
+                let value = format!("{}{}", before, after);
+                let pre = &line[..(x - before.len())];
+                let post = &line[(x + after.len())..];
+                let cen = format!("{}{}{}", pre, ".".repeat(value.len()), post);
+
+                let value_n = value.parse::<usize>().unwrap();
+
+                input[y] = cen;
+
+                sum += value_n;
+            }
+        }
+
+        sum
+    }
+
+    const fn coords(x: usize, y: usize) -> [(usize, usize); 8] {
+        [
+            (x + 1, y),     // right
+            (x - 1, y),     // left
+            (x, y + 1),     // down
+            (x, y - 1),     // up
+            (x + 1, y + 1), // down right
+            (x - 1, y - 1), // up left
+            (x + 1, y - 1), // up right
+            (x - 1, y + 1), // down left
+        ]
+    }
+
+    fn part_two(input: &str) -> usize {
+        let it = input.lines().enumerate().flat_map(|(y, line)| {
+            line.chars().enumerate().filter_map(
+                move |(x, ch)| {
+                    if ch == '*' {
+                        Some((x, y))
+                    } else {
+                        None
+                    }
+                },
+            )
+        });
+
+        let mut input: Vec<String> = input.lines().map(|st| st.to_owned()).collect();
+
+        let mut sum = 0;
+        for (x, y) in it {
+            let mut nums = vec![];
+            for (x, y) in coords(x, y) {
+                let Some(line) = input.iter().nth(y).clone() else {
+                    continue;
+                };
+
+                let Some(ch) = line.chars().nth(x) else {
+                    continue;
+                };
+
+                if !ch.is_digit(10) {
+                    continue;
+                }
+
+                let after = line
+                    .chars()
+                    .skip(x)
+                    .take_while(|c| c.is_digit(10))
+                    .collect::<String>();
+
+                let before = line
+                    .chars()
+                    .take(x)
+                    .collect::<Vec<_>>()
+                    .into_iter()
+                    .rev()
+                    .take_while(|c| c.is_digit(10))
+                    .collect::<String>()
+                    .chars()
+                    .rev()
+                    .collect::<String>();
+
+                let value = format!("{}{}", before, after);
+                let pre = &line[..(x - before.len())];
+                let post = &line[(x + after.len())..];
+                let cen = format!("{}{}{}", pre, ".".repeat(value.len()), post);
+
+                let value_n = value.parse::<usize>().unwrap();
+
+                input[y] = cen;
+
+                nums.push(value_n);
+            }
+            if let [one, two] = nums.as_slice() {
+                sum += one * two;
+            }
+        }
+
+        sum
+    }
+
+    #[test]
+    fn test_part_one() {
+        let ex = "
+467..114..
+...*......
+..35..633.
+......#...
+617*......
+.....+.58.
+..592.....
+......755.
+...$.*....
+.664.598..
+"
+        .trim();
+
+        assert_eq!(part_one(ex), 4361);
+        assert_eq!(part_one(include_str!("./data/day3.txt")), 532445);
+    }
+
+    #[test]
+    fn test_part_two() {
+        assert_eq!(part_two(include_str!("./data/day3.txt")), 79842967);
+    }
+}
